@@ -160,6 +160,9 @@ class Hook(Base):
     intensity: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
     channel: Mapped[str] = mapped_column(String(50), nullable=False, default="both")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="shown")
+    # Productivity technique suggested by LearningAgent/TechniqueAdvisor + temporal context key
+    technique: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    context_key: Mapped[str | None] = mapped_column(String(40), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow, server_default=func.now()
     )
@@ -363,6 +366,177 @@ class ExternalIntegration(Base):
         JSONBType, nullable=False, default=list
     )
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+        server_default=func.now(),
+    )
+
+
+class UserProfile(Base):
+    """Public-facing FOXUS profile (handle, bio, visibility, daily streak bookkeeping)."""
+
+    __tablename__ = "user_profiles"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    handle: Mapped[str] = mapped_column(String(40), nullable=False, unique=True, index=True)
+    bio: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    public_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    best_daily_streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    best_heat: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+        server_default=func.now(),
+    )
+
+
+class MomentumChain(Base):
+    """
+    'Racha de Enganche' for one concrete activity (task). Each completed hook becomes a link;
+    the chain heats up with richer evidence and breaks after 24 h idle or at the deadline.
+    """
+
+    __tablename__ = "momentum_chains"
+    __table_args__ = (
+        Index("ix_momentum_chains_user_status", "user_id", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
+    links_completed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    heat: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_link_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    broken_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, server_default=func.now()
+    )
+
+    links: Mapped[list[ChainLink]] = relationship(
+        back_populates="chain", cascade="all, delete-orphan", order_by="ChainLink.link_index"
+    )
+
+
+class ChainLink(Base):
+    __tablename__ = "chain_links"
+    __table_args__ = (
+        UniqueConstraint("chain_id", "link_index", name="uq_chain_links_chain_index"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    chain_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("momentum_chains.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    microtask_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("microtasks.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    session_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("sessions.id", ondelete="SET NULL"), nullable=True
+    )
+    link_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    technique: Mapped[str] = mapped_column(String(40), nullable=False, default="regla_2_min")
+    context_key: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    target_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
+    target_units: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    suggested_evidence: Mapped[str] = mapped_column(String(20), nullable=False, default="photo")
+    story_caption: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="proposed")
+    evidence_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    heat_points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, server_default=func.now()
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    chain: Mapped[MomentumChain] = relationship(back_populates="links")
+
+
+class ProfilePost(Base):
+    """A 'Momento' on the profile: evidence of a chain link (photo, voice, video frames)."""
+
+    __tablename__ = "profile_posts"
+    __table_args__ = (
+        Index("ix_profile_posts_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    chain_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("momentum_chains.id", ondelete="SET NULL"), nullable=True
+    )
+    link_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("chain_links.id", ondelete="SET NULL"), nullable=True
+    )
+    task_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    link_index: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    evidence_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    caption: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    detected_progress: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    image_base64: Mapped[str | None] = mapped_column(Text, nullable=True)
+    heat_points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    shared_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, server_default=func.now()
+    )
+
+
+class UserTechniqueStat(Base):
+    """Per-user contextual bandit statistics: technique x (urgency phase : time bucket)."""
+
+    __tablename__ = "user_technique_stats"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "technique", "context_key", name="uq_user_technique_stats_ctx"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    technique: Mapped[str] = mapped_column(String(40), nullable=False)
+    context_key: Mapped[str] = mapped_column(String(40), nullable=False)
+    shown_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    started_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completed_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    verified_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

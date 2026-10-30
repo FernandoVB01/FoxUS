@@ -16,6 +16,7 @@ from app.integrations.tasks_provider import ExternalTaskRecord, LocalTasksProvid
 from app.models.entities import FocusSession, Hook, Microtask, Task, UserPreference
 from app.schemas.agents import CalendarEventItem, TaskContext
 from app.services.gemma_client import GemmaClient
+from app.services.timing import BUCKET_LABELS, PHASE_LABELS, compute_time_context
 
 
 class ContextAgent:
@@ -103,21 +104,26 @@ class ContextAgent:
             dl = task.deadline if task.deadline.tzinfo else task.deadline.replace(tzinfo=UTC)
             hours_left = round((dl - now).total_seconds() / 3600.0, 2)
 
+        tctx = compute_time_context(
+            now_utc=now,
+            timezone_name=getattr(preferences, "timezone", None),
+            deadline=task.deadline,
+            events=calendar_events,
+            pending_deadlines=[t.deadline for t in pending_tasks],
+        )
+
         needs_pressure = bool(getattr(task, "needs_pressure", False))
         urgency = self._compute_urgency(hours_left, needs_pressure)
 
         next_event_clause = ""
-        if calendar_events:
-            first_ev = calendar_events[0]
-            ev_start = (
-                first_ev.start_at
-                if first_ev.start_at.tzinfo
-                else first_ev.start_at.replace(tzinfo=UTC)
+        if tctx.in_event_now:
+            available_minutes = min(available_minutes, 3)
+            next_event_clause = f" Estás en '{tctx.next_event_title}'."
+        elif tctx.minutes_until_next_event is not None and 5 <= tctx.minutes_until_next_event <= 90:
+            available_minutes = min(available_minutes, max(3, tctx.minutes_until_next_event - 5))
+            next_event_clause = (
+                f" Próximo evento '{tctx.next_event_title}' en {tctx.minutes_until_next_event} min."
             )
-            mins_to_ev = int((ev_start - now).total_seconds() // 60)
-            if 5 <= mins_to_ev <= 90:
-                available_minutes = min(available_minutes, max(3, mins_to_ev - 5))
-                next_event_clause = f" Próximo evento '{first_ev.title}' en {mins_to_ev} min."
 
         deadline_clause = (
             f"Entrega en {hours_left:.1f} h."
@@ -125,9 +131,11 @@ class ContextAgent:
             else ("Fecha límite vencida." if hours_left is not None else "Sin fecha límite fija.")
         )
         pressure_clause = " Modo presión voluntario activo." if needs_pressure else ""
+        load_clause = f" {tctx.load_next_72h} entregas en 72 h." if tctx.load_next_72h >= 2 else ""
         deterministic_summary = (
-            f"Tarea '{task.title}' (urgencia {urgency}). {deadline_clause}{pressure_clause}"
-            f"{next_event_clause} Ventana: {available_minutes} min."
+            f"Tarea '{task.title}' ({PHASE_LABELS[tctx.urgency_phase]}, "
+            f"{BUCKET_LABELS[tctx.time_bucket]}). {deadline_clause}{pressure_clause}"
+            f"{next_event_clause}{load_clause} Ventana: {available_minutes} min."
         )
 
         summary_text = deterministic_summary
@@ -143,6 +151,8 @@ class ContextAgent:
                     "task_title": task.title,
                     "task_description": task.description,
                     "hours_until_deadline": hours_left,
+                    "urgency_phase": tctx.urgency_phase,
+                    "local_time_bucket": tctx.time_bucket,
                     "needs_pressure": needs_pressure,
                     "urgency_level": urgency,
                     "available_minutes": available_minutes,
@@ -179,6 +189,12 @@ class ContextAgent:
             contextual_summary=summary_text,
             generation_source=gen_source,  # type: ignore[arg-type]
             model_name=model_used,
+            urgency_phase=tctx.urgency_phase,
+            time_bucket=tctx.time_bucket,
+            local_time_label=tctx.local_now.strftime("%H:%M"),
+            minutes_until_next_event=tctx.minutes_until_next_event,
+            next_event_title=tctx.next_event_title,
+            load_next_72h=tctx.load_next_72h,
         )
 
         elapsed_ms = max(1, int((time.perf_counter_ns() - start_ns) // 1_000_000))
@@ -196,8 +212,11 @@ class ContextAgent:
             },
             output_summary={
                 "urgency_level": urgency,
+                "urgency_phase": tctx.urgency_phase,
+                "time_bucket": tctx.time_bucket,
                 "recent_rejections_for_task": rejections,
                 "upcoming_events_count": len(calendar_events),
+                "load_next_72h": tctx.load_next_72h,
                 "generation_source": gen_source,
             },
         )

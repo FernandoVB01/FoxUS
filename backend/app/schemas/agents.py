@@ -33,6 +33,13 @@ class TaskContext(BaseModel):
     contextual_summary: str
     generation_source: Literal["gemma", "deterministic_rules"] = "deterministic_rules"
     model_name: str | None = None
+    # Temporal awareness (deadline phase x local time x calendar)
+    urgency_phase: str = "no_deadline"
+    time_bucket: str = "afternoon"
+    local_time_label: str | None = None
+    minutes_until_next_event: int | None = None
+    next_event_title: str | None = None
+    load_next_72h: int = 0
 
 
 class MicrotaskProposal(BaseModel):
@@ -43,7 +50,8 @@ class MicrotaskProposal(BaseModel):
     lcd_short_title: str = Field(min_length=1, max_length=16)
     description: str = Field(min_length=5, max_length=1000)
     steps: list[str] = Field(default_factory=list)
-    estimated_seconds: int = Field(default=180, ge=30, le=900)
+    # Up to 2h so MomentumAgent chain links (e.g. "6 slides in 35 min") fit the same contract
+    estimated_seconds: int = Field(default=180, ge=30, le=7200)
     success_criteria: str = Field(min_length=3, max_length=500)
     rationale: str = Field(min_length=3, max_length=500)
     difficulty_adapted: bool = False
@@ -78,6 +86,12 @@ class LearningSnapshot(BaseModel):
     rejection_rate: float = 0.0
     scores_by_hook: dict[str, float] = Field(default_factory=dict)
     strategy: str = "adaptive_ucb_v1"
+    # Contextual technique bandit (phase x time of day)
+    recommended_technique: str | None = None
+    technique_label: str | None = None
+    technique_reason: str | None = None
+    technique_scores: dict[str, float] = Field(default_factory=dict)
+    context_key: str | None = None
 
 
 class PolicyDecision(BaseModel):
@@ -100,6 +114,23 @@ class GenerateMissionRequest(BaseModel):
     ignore_cooldown_for_demo: bool = False
 
 
+class ChainBrief(BaseModel):
+    """Domino-effect info attached to a mission when it is a chain link (MomentumAgent)."""
+
+    chain_id: uuid.UUID
+    link_id: uuid.UUID
+    link_index: int
+    links_completed: int = 0
+    multiplier: float = 1.0
+    technique: str
+    technique_label: str
+    target_minutes: int
+    target_units: str | None = None
+    suggested_evidence: Literal["photo", "voice", "video"] = "photo"
+    story_caption: str | None = None
+    expires_at: datetime | None = None
+
+
 class GenerateMissionResponse(BaseModel):
     """Full mission payload returned to Android APK and auditable in Agent Debug."""
 
@@ -115,6 +146,7 @@ class GenerateMissionResponse(BaseModel):
     hook: HookProposal
     learning: LearningSnapshot
     dispatched_device_command_id: uuid.UUID | None = None
+    chain: ChainBrief | None = None
 
 
 class PressureEvaluationRequest(BaseModel):
