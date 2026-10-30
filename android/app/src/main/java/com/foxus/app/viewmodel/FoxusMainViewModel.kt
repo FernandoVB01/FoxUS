@@ -200,12 +200,52 @@ class FoxusMainViewModel(
             repository.fetchGoogleStatus().onSuccess { status ->
                 _uiState.update { it.copy(googleStatus = status) }
                 if (status.connected) {
-                    repository.syncGoogleNow()
+                    repository.syncGoogleNow().onSuccess { syncRes ->
+                        if (!syncRes.ok && syncRes.detail.contains("venció")) {
+                            refreshGoogleStatus()
+                            _uiState.update { it.copy(statusBanner = syncRes.detail) }
+                        }
+                    }
+                } else if (status.tokenExpired && !status.statusMessage.isNullOrBlank()) {
+                    _uiState.update { it.copy(statusBanner = "⚠️ ${status.statusMessage}") }
                 }
             }
-            repository.refreshTasks()
+            repository.refreshTasks(forceSync = false)
             refreshRewardsAndHistory()
             refreshDevices()
+        }
+    }
+
+    fun refreshAllManual() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val healthRes = repository.checkBackendHealth()
+            healthRes.onSuccess { h ->
+                val aiMode = if (h.ai?.apiKeyConfigured == true) "Gemma 4 activo" else "Modo local"
+                _uiState.update { it.copy(backendOnline = h.status == "ok", aiModeLabel = aiMode) }
+            }.onFailure {
+                _uiState.update { it.copy(backendOnline = false, aiModeLabel = "Sin conexión") }
+            }
+
+            var feedbackMsg: String? = null
+            repository.syncGoogleNow().onSuccess { syncRes ->
+                feedbackMsg = syncRes.detail
+            }
+            repository.refreshTasks(forceSync = true)
+            repository.fetchGoogleStatus().onSuccess { status ->
+                _uiState.update { it.copy(googleStatus = status) }
+                if (status.tokenExpired && feedbackMsg == null) {
+                    feedbackMsg = "⚠️ ${status.statusMessage ?: "Tu token temporal de Google venció."}"
+                }
+            }
+            refreshRewardsAndHistory()
+            refreshDevices()
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    statusBanner = feedbackMsg ?: "Tareas actualizadas."
+                )
+            }
         }
     }
 

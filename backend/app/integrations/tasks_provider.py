@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Protocol
 import httpx
 from sqlalchemy import select
@@ -80,12 +80,13 @@ class GoogleTasksProvider:
             lists_resp.raise_for_status()
             task_lists = lists_resp.json().get("items", []) or [{"id": "@default", "title": "Mis tareas"}]
 
-            for tlist in task_lists[:4]:
+            raw_entries: list[tuple[str, ExternalTaskRecord]] = []
+            for tlist in task_lists[:10]:
                 list_id = tlist.get("id", "@default")
                 list_title = tlist.get("title", "")
                 resp = client.get(
                     f"{self.BASE_URL}/lists/{list_id}/tasks",
-                    params={"showCompleted": "false", "showHidden": "false", "maxResults": 25},
+                    params={"showCompleted": "false", "showHidden": "false", "maxResults": 100},
                     headers=headers,
                 )
                 resp.raise_for_status()
@@ -98,22 +99,38 @@ class GoogleTasksProvider:
                         continue
                     seen_ids.add(item_id)
                     due_raw = item.get("due")
-                    due_dt = (
-                        datetime.fromisoformat(due_raw.replace("Z", "+00:00"))
-                        if due_raw
-                        else None
-                    )
+                    due_dt: datetime | None = None
+                    if due_raw:
+                        parsed_due = datetime.fromisoformat(due_raw.replace("Z", "+00:00"))
+                        # Google Tasks REST API v1 strips time-of-day to 00:00:00Z.
+                        # Shift date-only deadlines to 23:59 local Ecuador time (UTC-5 -> +28h59m)
+                        # so tasks due today (e.g., 20:30) are treated as due tonight instead of yesterday.
+                        if due_raw.endswith("T00:00:00.000Z") or due_raw.endswith("T00:00:00Z"):
+                            due_dt = parsed_due + timedelta(hours=28, minutes=59)
+                        else:
+                            due_dt = parsed_due
+
                     notes = item.get("notes")
-                    desc = f"[Google Tasks · {list_title}] {notes}" if notes and list_title else (
-                        notes or (f"Sincronizada desde Google Tasks ({list_title})" if list_title else None)
+                    desc = (
+                        f"[Google Tasks · {list_title}] {notes}"
+                        if notes and list_title
+                        else (notes or (f"Sincronizada desde Google Tasks ({list_title})" if list_title else None))
                     )
-                    results.append(
-                        ExternalTaskRecord(
-                            external_id=f"gtask:{item_id}",
-                            title=title_raw[:250],
-                            description=desc,
-                            deadline=due_dt,
-                            source="google_tasks",
+                    updated_iso = str(item.get("updated", ""))
+                    raw_entries.append(
+                        (
+                            updated_iso,
+                            ExternalTaskRecord(
+                                external_id=f"gtask:{item_id}",
+                                title=title_raw[:250],
+                                description=desc,
+                                deadline=due_dt,
+                                source="google_tasks",
+                            ),
                         )
                     )
+
+            # Newest updated Google Tasks first
+            raw_entries.sort(key=lambda pair: pair[0], reverse=True)
+            results = [rec for _, rec in raw_entries]
         return results

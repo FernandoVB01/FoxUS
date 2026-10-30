@@ -69,7 +69,10 @@ fun TasksScreen(
 ) {
     val context = LocalContext.current
     var showCreateForm by remember { mutableStateOf(false) }
-    var showGooglePanel by remember { mutableStateOf(false) }
+    var showGooglePanel by remember(uiState.googleStatus.tokenExpired) {
+        mutableStateOf(uiState.googleStatus.tokenExpired)
+    }
+    var showRenewTokenBox by remember { mutableStateOf(false) }
 
     var titleInput by remember { mutableStateOf("") }
     var descInput by remember { mutableStateOf("") }
@@ -89,20 +92,25 @@ fun TasksScreen(
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Clean Top Bar with 2 Action Toggles (+ Tarea | Google Sync)
+        // Clean Top Bar with 2 Action Toggles (+ Tarea | Google Sync) - responsive, never wraps vertically
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Proyectos y Retos",
+                text = "Tareas",
                 style = MaterialTheme.typography.headlineSmall,
                 color = FoxusTokens.WarmCream,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                modifier = Modifier.weight(1f)
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 OutlinedButton(
                     onClick = {
                         showGooglePanel = !showGooglePanel
@@ -113,12 +121,22 @@ fun TasksScreen(
                     Icon(
                         Icons.Filled.CloudSync,
                         contentDescription = null,
-                        tint = if (uiState.googleStatus.connected) FoxusTokens.SuccessEmerald else FoxusTokens.FoxGold
+                        tint = when {
+                            uiState.googleStatus.tokenExpired -> FoxusTokens.WarningAmber
+                            uiState.googleStatus.connected -> FoxusTokens.SuccessEmerald
+                            else -> FoxusTokens.FoxGold
+                        }
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (uiState.googleStatus.connected) "Google ✓" else "Google",
-                        color = FoxusTokens.WarmCream
+                        text = when {
+                            uiState.googleStatus.tokenExpired -> "Google ⚠️"
+                            uiState.googleStatus.connected -> "Google ✓"
+                            else -> "Google"
+                        },
+                        color = if (uiState.googleStatus.tokenExpired) FoxusTokens.WarningAmber else FoxusTokens.WarmCream,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
 
@@ -134,7 +152,7 @@ fun TasksScreen(
                     )
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = null)
-                    Text("Nueva", fontWeight = FontWeight.Bold)
+                    Text("Nueva", fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                 }
             }
         }
@@ -146,17 +164,29 @@ fun TasksScreen(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(18.dp))
                     .background(FoxusTokens.DeepNavy)
-                    .border(1.dp, FoxusTokens.FoxGold.copy(alpha = 0.45f), RoundedCornerShape(18.dp))
+                    .border(
+                        1.dp,
+                        if (uiState.googleStatus.tokenExpired) FoxusTokens.WarningAmber else FoxusTokens.FoxGold.copy(alpha = 0.45f),
+                        RoundedCornerShape(18.dp)
+                    )
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
                     text = "Google Tasks + Google Calendar",
                     style = MaterialTheme.typography.titleMedium,
-                    color = FoxusTokens.FoxGold
+                    color = if (uiState.googleStatus.tokenExpired) FoxusTokens.WarningAmber else FoxusTokens.FoxGold
                 )
 
-                if (uiState.googleStatus.connected) {
+                if (uiState.googleStatus.tokenExpired) {
+                    Text(
+                        text = "⚠️ Tu Access Token temporal (ya29...) dura 1 hora en Google y ya expiró (por eso dio HTTP 401). Pega uno nuevo aquí abajo para traer tus tareas nuevas al instante:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = FoxusTokens.WarningAmber
+                    )
+                }
+
+                if (uiState.googleStatus.connected && !uiState.googleStatus.tokenExpired) {
                     Text(
                         text = "• Conectado (${uiState.googleStatus.connectedEmail ?: uiState.googleStatus.authMode})\n" +
                             "• ${uiState.googleStatus.syncedGoogleTasksCount} tareas y ${uiState.googleStatus.upcomingEventsCount} eventos próximos",
@@ -186,27 +216,102 @@ fun TasksScreen(
                             Text("Desconectar", color = FoxusTokens.TextSecondary)
                         }
                     }
-                } else {
-                    Button(
-                        onClick = {
-                            onOpenGoogleOAuth { authUrl ->
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(authUrl)))
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = FoxusTokens.FoxOrange,
-                            contentColor = FoxusTokens.DarkSurface
-                        )
+                    TextButton(
+                        onClick = { showRenewTokenBox = !showRenewTokenBox },
+                        modifier = Modifier.align(Alignment.End)
                     ) {
-                        Text("1. Iniciar sesión con Google (OAuth 2.0)", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = if (showRenewTokenBox) "Ocultar renovación de token" else "Actualizar token ya29...",
+                            color = FoxusTokens.FoxGold
+                        )
+                    }
+                    AnimatedVisibility(visible = showRenewTokenBox) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = oauthTokenInput,
+                                onValueChange = { oauthTokenInput = it },
+                                label = { Text("Nuevo Access Token (ya29...)") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            if (oauthTokenInput.isNotBlank()) {
+                                Button(
+                                    onClick = {
+                                        onConnectGoogleToken(oauthTokenInput, null)
+                                        oauthTokenInput = ""
+                                        showRenewTokenBox = false
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = FoxusTokens.SuccessEmerald,
+                                        contentColor = FoxusTokens.DarkSurface
+                                    )
+                                ) {
+                                    Text("GUARDAR Y SINCRONIZAR", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = oauthTokenInput,
+                        onValueChange = { oauthTokenInput = it },
+                        label = { Text("Pega tu Access Token (ya29...)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                onConnectGoogleToken(oauthTokenInput, icalUrlInput.ifBlank { null })
+                                oauthTokenInput = ""
+                            },
+                            enabled = oauthTokenInput.isNotBlank() && !uiState.isLoading,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = FoxusTokens.FoxOrange,
+                                contentColor = FoxusTokens.DarkSurface
+                            )
+                        ) {
+                            Text("Sincronizar Token", fontWeight = FontWeight.Bold)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                context.startActivity(
+                                    Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse("https://developers.google.com/oauthplayground")
+                                    )
+                                )
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("OAuth Playground ↗", color = FoxusTokens.FoxGold)
+                        }
+                    }
+
+                    if (uiState.googleStatus.oauthConfiguredOnServer) {
+                        OutlinedButton(
+                            onClick = {
+                                onOpenGoogleOAuth { authUrl ->
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(authUrl)))
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Iniciar sesión permanente con Google (OAuth 2.0)", color = FoxusTokens.WarmCream)
+                        }
                     }
 
                     OutlinedTextField(
                         value = icalUrlInput,
                         onValueChange = { icalUrlInput = it },
-                        label = { Text("Opción rápida Calendar: URL secreta iCal (.ics)") },
+                        label = { Text("Opcional Calendar: URL secreta iCal (.ics)") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -219,25 +324,6 @@ fun TasksScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("Conectar Google Calendar (.ics)", color = FoxusTokens.FoxGold)
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = oauthTokenInput,
-                        onValueChange = { oauthTokenInput = it },
-                        label = { Text("Opción Token directo (Tasks + Calendar API)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    if (oauthTokenInput.isNotBlank()) {
-                        OutlinedButton(
-                            onClick = {
-                                onConnectGoogleToken(oauthTokenInput, icalUrlInput.ifBlank { null })
-                                oauthTokenInput = ""
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Sincronizar Google Tasks + Calendar", color = FoxusTokens.SuccessEmerald)
                         }
                     }
                 }

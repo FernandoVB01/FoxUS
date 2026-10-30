@@ -178,6 +178,8 @@ data class PressureEvaluationResponseDto(
 data class GoogleStatusResponseDto(
     @SerialName("oauth_configured_on_server") val oauthConfiguredOnServer: Boolean = false,
     val connected: Boolean = false,
+    @SerialName("token_expired") val tokenExpired: Boolean = false,
+    @SerialName("status_message") val statusMessage: String? = null,
     @SerialName("auth_mode") val authMode: String = "none",
     @SerialName("connected_email") val connectedEmail: String? = null,
     @SerialName("has_calendar_ical") val hasCalendarIcal: Boolean = false,

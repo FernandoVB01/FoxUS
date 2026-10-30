@@ -172,6 +172,28 @@ fun HomeScreen(
             }
         }
 
+        if (uiState.googleStatus.tokenExpired) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(FoxusTokens.DeepNavy)
+                    .border(1.dp, FoxusTokens.WarningAmber, RoundedCornerShape(14.dp))
+                    .clickable(onClick = onGoToTasks)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "⚠️ Tu token temporal de Google venció (1h). Toca aquí para renovarlo y traer tus tareas nuevas.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = FoxusTokens.WarningAmber,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
         // 2. Clean Protagonist Stage
         Column(
             modifier = Modifier.fillMaxWidth(),

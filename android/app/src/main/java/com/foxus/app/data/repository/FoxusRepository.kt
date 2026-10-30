@@ -49,8 +49,8 @@ class FoxusRepository(
         api.getHealth()
     }
 
-    suspend fun refreshTasks(): Result<List<TaskDto>> = runCatching {
-        val remoteTasks = api.listTasks()
+    suspend fun refreshTasks(forceSync: Boolean = false): Result<List<TaskDto>> = runCatching {
+        val remoteTasks = api.listTasks(forceSync = forceSync)
         val now = System.currentTimeMillis()
         val entities = remoteTasks.map { task ->
             val latestMicro = task.microtasks.maxByOrNull { it.createdAt }

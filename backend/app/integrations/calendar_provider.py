@@ -86,10 +86,11 @@ class GoogleCalendarProvider:
         if not self._access_token:
             return []
         now = datetime.now(UTC)
+        start_window = now - timedelta(hours=2)
         end = now + timedelta(hours=horizon_hours)
         headers = {"Authorization": f"Bearer {self._access_token}"}
         params = {
-            "timeMin": now.isoformat(),
+            "timeMin": start_window.isoformat(),
             "timeMax": end.isoformat(),
             "singleEvents": "true",
             "orderBy": "startTime",

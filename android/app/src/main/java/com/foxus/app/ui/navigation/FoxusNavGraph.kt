@@ -226,7 +226,7 @@ fun FoxusNavHost(
                         viewModel.updateSmartPressureSettings(sched, overlay)
                     },
                     onRefreshOverlayPermission = { viewModel.refreshOverlayPermissionStatus() },
-                    onRefresh = { viewModel.refreshAllSilent() }
+                    onRefresh = { viewModel.refreshAllManual() }
                 )
             }
             composable(FoxusRoutes.TASKS) {

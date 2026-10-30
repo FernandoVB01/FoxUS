@@ -18,10 +18,15 @@ router = APIRouter(prefix="/tasks", tags=["Tasks"])
 @router.get("", response_model=list[TaskRead], summary="List user tasks and generated microtasks")
 def list_tasks(
     status_filter: str | None = None,
+    force_sync: bool = False,
     user: User = Depends(get_current_demo_user),
     db: Session = Depends(get_db),
 ) -> list[Task]:
-    auto_sync_google_if_connected(db=db, user=user, min_interval_seconds=25)
+    auto_sync_google_if_connected(
+        db=db,
+        user=user,
+        min_interval_seconds=0 if force_sync else 8,
+    )
     stmt = (
         select(Task)
         .options(selectinload(Task.microtasks))

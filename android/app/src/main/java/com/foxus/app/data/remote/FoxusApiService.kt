@@ -15,6 +15,7 @@ import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
 
 interface FoxusApiService {
@@ -22,7 +23,7 @@ interface FoxusApiService {
     suspend fun getHealth(): HealthResponseDto
 
     @GET("api/v1/tasks")
-    suspend fun listTasks(): List<TaskDto>
+    suspend fun listTasks(@Query("force_sync") forceSync: Boolean = false): List<TaskDto>
 
     @POST("api/v1/tasks")
     suspend fun createTask(@Body payload: TaskCreateRequestDto): TaskDto

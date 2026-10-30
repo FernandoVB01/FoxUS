@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+import json
 from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import HTMLResponse
@@ -33,6 +34,8 @@ GOOGLE_READONLY_SCOPES = (
 class GoogleStatusResponse(BaseModel):
     oauth_configured_on_server: bool
     connected: bool
+    token_expired: bool = False
+    status_message: str | None = None
     auth_mode: str = "none"
     connected_email: str | None = None
     has_calendar_ical: bool = False
@@ -124,6 +127,7 @@ def _execute_google_sync(
     updated_tasks = 0
     events: list[CalendarEventItem] = []
     warnings: list[str] = []
+    hit_unauthorized = False
 
     token = _maybe_refresh_oauth_token(integ, settings)
 
@@ -154,12 +158,20 @@ def _execute_google_sync(
                     )
                     imported_tasks += 1
                 else:
-                    existing.title = ext.title
-                    existing.description = ext.description
-                    existing.deadline = ext.deadline
-                    updated_tasks += 1
+                    if (
+                        existing.title != ext.title
+                        or existing.description != ext.description
+                        or existing.deadline != ext.deadline
+                    ):
+                        existing.title = ext.title
+                        existing.description = ext.description
+                        existing.deadline = ext.deadline
+                        updated_tasks += 1
         except httpx.HTTPStatusError as exc:
-            warnings.append(f"Google Tasks HTTP {exc.response.status_code}")
+            if exc.response.status_code == 401:
+                hit_unauthorized = True
+            else:
+                warnings.append(f"Google Tasks HTTP {exc.response.status_code}")
         except Exception:
             warnings.append("No se pudo leer Google Tasks")
 
@@ -170,7 +182,10 @@ def _execute_google_sync(
             )
             events.extend(cal_events)
         except httpx.HTTPStatusError as exc:
-            warnings.append(f"Google Calendar API HTTP {exc.response.status_code}")
+            if exc.response.status_code == 401:
+                hit_unauthorized = True
+            else:
+                warnings.append(f"Google Calendar API HTTP {exc.response.status_code}")
         except Exception:
             warnings.append("No se pudo leer Google Calendar API")
 
@@ -188,20 +203,31 @@ def _execute_google_sync(
         except Exception:
             warnings.append("No se pudo descargar el enlace iCal (.ics)")
 
+    if hit_unauthorized and not integ.refresh_token:
+        integ.auth_mode = "token_expired"
+        integ.token_expires_at = datetime.now(UTC) - timedelta(seconds=1)
+
     events.sort(key=lambda e: e.start_at)
-    integ.cached_events_json = [e.model_dump(mode="json") for e in events[:25]]
+    if events or not hit_unauthorized:
+        integ.cached_events_json = [e.model_dump(mode="json") for e in events[:25]]
     integ.last_synced_at = datetime.now(UTC)
     db.commit()
 
-    summary = (
-        f"Sincronizado: +{imported_tasks} tareas nuevas ({updated_tasks} actualizadas) "
-        f"y {len(events)} eventos próximos."
-    )
-    if warnings:
-        summary += f" Avisos: {'; '.join(warnings)}."
+    if hit_unauthorized:
+        summary = (
+            "⚠️ Tu Access Token temporal de Google venció (dura 1 hora). "
+            "Renueva el token ya29... en Tareas -> Google para importar tus tareas nuevas."
+        )
+    else:
+        summary = (
+            f"Sincronizado: +{imported_tasks} tareas nuevas ({updated_tasks} actualizadas) "
+            f"y {len(events)} eventos próximos."
+        )
+        if warnings:
+            summary += f" Avisos: {'; '.join(warnings)}."
 
     return GoogleSyncResponse(
-        ok=len(warnings) == 0 or imported_tasks > 0 or len(events) > 0,
+        ok=(not hit_unauthorized) and (len(warnings) == 0 or imported_tasks > 0 or len(events) > 0),
         imported_tasks=imported_tasks,
         updated_tasks=updated_tasks,
         synced_events=len(events),
@@ -240,9 +266,17 @@ def get_google_status(
         return GoogleStatusResponse(
             oauth_configured_on_server=oauth_ready,
             connected=False,
+            token_expired=False,
             auth_mode="none",
             synced_google_tasks_count=gtasks_count,
         )
+
+    now = datetime.now(UTC)
+    exp = integ.token_expires_at
+    exp_utc = (exp if exp.tzinfo else exp.replace(tzinfo=UTC)) if exp is not None else None
+    is_expired = integ.auth_mode == "token_expired" or (
+        exp_utc is not None and exp_utc <= now and not integ.refresh_token
+    )
 
     upcoming: list[CalendarEventItem] = []
     for raw in integ.cached_events_json or []:
@@ -253,7 +287,13 @@ def get_google_status(
 
     return GoogleStatusResponse(
         oauth_configured_on_server=oauth_ready,
-        connected=True,
+        connected=not is_expired,
+        token_expired=is_expired,
+        status_message=(
+            "Tu Access Token temporal (ya29...) expiró tras 1 hora. Pega uno nuevo abajo para sincronizar."
+            if is_expired
+            else None
+        ),
         auth_mode=integ.auth_mode,
         connected_email=integ.connected_email,
         has_calendar_ical=bool(integ.calendar_ical_url),
@@ -373,6 +413,13 @@ def connect_google_access_token(
     db: Session = Depends(get_db),
 ) -> GoogleSyncResponse:
     clean_tok = payload.access_token.strip()
+    if clean_tok.startswith("{"):
+        try:
+            parsed_json = json.loads(clean_tok)
+            if isinstance(parsed_json, dict) and parsed_json.get("access_token"):
+                clean_tok = str(parsed_json["access_token"]).strip()
+        except Exception:
+            pass
     if clean_tok.lower().startswith("bearer "):
         clean_tok = clean_tok[7:].strip()
 
@@ -387,24 +434,45 @@ def connect_google_access_token(
         )
 
     email: str | None = None
+    expires_in_sec: int = 3500
     try:
         with httpx.Client(timeout=8.0) as client:
+            t_info = client.get(
+                "https://oauth2.googleapis.com/tokeninfo",
+                params={"access_token": clean_tok},
+            )
+            if t_info.status_code == 200:
+                info_json = t_info.json()
+                email = info_json.get("email") or email
+                if info_json.get("expires_in"):
+                    expires_in_sec = int(info_json["expires_in"])
             u_resp = client.get(
                 GOOGLE_USERINFO_URL,
                 headers={"Authorization": f"Bearer {clean_tok}"},
             )
             if u_resp.status_code == 200:
-                email = u_resp.json().get("email")
+                email = u_resp.json().get("email") or email
     except Exception:
         pass
 
     integ = _get_or_create_google_integration(db, user.id)
     integ.auth_mode = "token"
     integ.access_token = clean_tok
+    integ.token_expires_at = datetime.now(UTC) + timedelta(seconds=expires_in_sec)
     integ.connected_email = email or integ.connected_email
     if payload.calendar_ical_url:
         integ.calendar_ical_url = payload.calendar_ical_url.strip()
-    return _execute_google_sync(db, user, integ, settings)
+    res = _execute_google_sync(db, user, integ, settings)
+    if integ.auth_mode == "token_expired":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Ese Access Token ya está vencido o no tiene permisos para Google Tasks. "
+                "En OAuth Playground haz clic en 'Refresh access token' o 'Exchange authorization code for tokens' "
+                "y pega el nuevo ya29..."
+            ),
+        )
+    return res
 
 
 @router.post("/google/connect-ical", response_model=GoogleSyncResponse)
