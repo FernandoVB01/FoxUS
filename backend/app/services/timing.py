@@ -133,7 +133,7 @@ def compute_time_context(
         local_now=local_now,
         local_hour=local_now.hour,
         time_bucket=bucket_for_hour(local_now.hour),
-        urgency_phase=phase_for_hours(hours_left),
+        urgency_phase=("same_day" if deadline is not None and hours_left >= 0 and _aware(deadline).astimezone(tz).date() == local_now.date() else phase_for_hours(hours_left)),
         hours_left=hours_left,
         minutes_until_next_event=minutes_to_next,
         next_event_title=next_title,

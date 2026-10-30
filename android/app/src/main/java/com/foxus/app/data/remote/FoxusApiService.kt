@@ -19,6 +19,18 @@ import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
 
 interface FoxusApiService {
+    @GET("api/v1/profile/moments/{postId}/media")
+    suspend fun momentMedia(@Path("postId") postId: String): okhttp3.ResponseBody
+
+    @GET("api/v1/profile")
+    suspend fun getMomentumProfile(): MomentumProfileDto
+
+    @POST("api/v1/profile/chains/{chainId}/continue")
+    suspend fun continueMomentum(@Path("chainId") chainId: String, @Body payload: ContinueMomentumDto): GenerateMissionResponseDto
+
+    @POST("api/v1/profile/moments")
+    suspend fun createMoment(@Body payload: CreateMomentDto): kotlinx.serialization.json.JsonObject
+
     @GET("api/v1/health")
     suspend fun getHealth(): HealthResponseDto
 

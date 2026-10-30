@@ -7,9 +7,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.agents.learning_agent import LearningAgent
-from app.models.entities import FocusSession, Hook, Microtask, SessionEvent, Task, User
+from app.models.entities import ChainLink, FocusSession, Hook, Microtask, SessionEvent, Task, User
 from app.schemas.sessions import HookDismissResponse, SessionActionResponse, SessionRead
 from app.services.reward_engine import RewardEngine
+from app.services.technique_advisor import TechniqueAdvisor
+from app.services.momentum import record_completion
 
 
 class SessionLifecycleService:
@@ -56,6 +58,14 @@ class SessionLifecycleService:
         now = datetime.now(UTC)
         hook_row = self._db.get(Hook, hook_id) if hook_id else None
 
+        if hook_id and (hook_row is None or hook_row.user_id != user.id or hook_row.microtask_id != microtask_id):
+            raise HTTPException(404, "Hook not found for this microtask.")
+        link = self._db.scalar(select(ChainLink).where(ChainLink.microtask_id == microtask_id))
+        if link and link.status == "completed":
+            raise HTTPException(409, "Este avance ya fue completado.")
+        if link:
+            link.status = "started"
+
         if existing_session is not None:
             session_row = existing_session
         else:
@@ -68,6 +78,9 @@ class SessionLifecycleService:
             )
             self._db.add(session_row)
             self._db.flush()
+
+            if hook_row:
+                TechniqueAdvisor(self._db).record(user_id=user.id, technique=hook_row.technique, context_key=hook_row.context_key, outcome="started")
 
             if task.status == "pending":
                 task.status = "in_progress"
@@ -128,7 +141,7 @@ class SessionLifecycleService:
         session_row = self._db.scalar(
             select(FocusSession).where(
                 FocusSession.id == session_id, FocusSession.user_id == user.id
-            )
+            ).with_for_update()
         )
         if session_row is None:
             raise HTTPException(
@@ -145,6 +158,9 @@ class SessionLifecycleService:
             session_row.completion_source = f"{source}_self_reported"
 
             hook_row = self._db.get(Hook, session_row.hook_id) if session_row.hook_id else None
+            record_completion(self._db, session_row)
+            if hook_row:
+                TechniqueAdvisor(self._db).record(user_id=user.id, technique=hook_row.technique, context_key=hook_row.context_key, outcome="completed")
             hook_type = hook_row.hook_type if hook_row else "challenge"
             self._learning.record_outcome(
                 user_id=user.id, hook_type=hook_type, outcome="completed"
@@ -203,7 +219,7 @@ class SessionLifecycleService:
         session_row = self._db.scalar(
             select(FocusSession).where(
                 FocusSession.id == session_id, FocusSession.user_id == user.id
-            )
+            ).with_for_update()
         )
         if session_row is None:
             raise HTTPException(
@@ -211,6 +227,9 @@ class SessionLifecycleService:
             )
 
         if session_row.status == "started":
+            link = self._db.scalar(select(ChainLink).where(ChainLink.microtask_id == session_row.microtask_id))
+            if link and link.status == "started":
+                link.status = "stopped"
             session_row.status = "stopped"
             session_row.ended_at = datetime.now(UTC)
             session_row.completion_source = reason

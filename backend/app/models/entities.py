@@ -509,6 +509,8 @@ class ProfilePost(Base):
     evidence_type: Mapped[str] = mapped_column(String(20), nullable=False)
     caption: Mapped[str | None] = mapped_column(String(200), nullable=True)
     detected_progress: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    media_base64: Mapped[str | None] = mapped_column(Text, nullable=True)
+    media_mime: Mapped[str | None] = mapped_column(String(80), nullable=True)
     image_base64: Mapped[str | None] = mapped_column(Text, nullable=True)
     heat_points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     shared_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

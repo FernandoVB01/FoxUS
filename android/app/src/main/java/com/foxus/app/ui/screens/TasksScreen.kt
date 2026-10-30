@@ -180,7 +180,7 @@ fun TasksScreen(
 
                 if (uiState.googleStatus.tokenExpired) {
                     Text(
-                        text = "⚠️ Tu Access Token temporal (ya29...) dura 1 hora en Google y ya expiró (por eso dio HTTP 401). Pega uno nuevo aquí abajo para traer tus tareas nuevas al instante:",
+                        text = "Reconecta Google para actualizar tus tareas.",
                         style = MaterialTheme.typography.bodySmall,
                         color = FoxusTokens.WarningAmber
                     )
@@ -304,7 +304,7 @@ fun TasksScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Iniciar sesión permanente con Google (OAuth 2.0)", color = FoxusTokens.WarmCream)
+                            Text("Conectar con Google", color = FoxusTokens.WarmCream)
                         }
                     }
 
@@ -344,7 +344,7 @@ fun TasksScreen(
                 OutlinedTextField(
                     value = titleInput,
                     onValueChange = { titleInput = it },
-                    label = { Text("Proyecto o tarea (Ej: 12 diapositivas)") },
+                    label = { Text("Actividad: 12 diapositivas") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -383,7 +383,7 @@ fun TasksScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "🔥 Admito que necesito presión de FOX",
+                        text = "Recordarme empezar",
                         style = MaterialTheme.typography.bodyMedium,
                         color = FoxusTokens.WarmCream
                     )
@@ -420,7 +420,7 @@ fun TasksScreen(
                         contentColor = FoxusTokens.DarkSurface
                     )
                 ) {
-                    Text("GUARDAR PROYECTO", fontWeight = FontWeight.Bold)
+                    Text("GUARDAR ACTIVIDAD", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -556,7 +556,7 @@ fun TasksScreen(
                         ) {
                             Icon(Icons.Filled.Bolt, contentDescription = null)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Reto 3m", fontWeight = FontWeight.Bold)
+                            Text("Empezar", fontWeight = FontWeight.Bold)
                         }
                         OutlinedButton(
                             onClick = { onGenerateMission(task.id, task.title, "fox_bzz") },

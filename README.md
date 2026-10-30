@@ -85,3 +85,19 @@ Copy-Item backend\.env.example backend\.env
 ## 6. Licencia
 
 Código fuente distribuido bajo **Apache License 2.0** ([`LICENSE`](LICENSE)). Consulta [`assets/ASSETS_LICENSES.md`](assets/ASSETS_LICENSES.md) para los detalles de marca y recursos multimedia.
+
+## Enganches y perfil
+
+Continuidad por actividad, momentos multimedia e historias exportables: [flujo y límites de la demo](docs/momentum.md).
+
+El perfil incluye métricas de foco registrado, ritmo por unidad, avances y un zorrito
+personalizable. Las continuaciones admiten temporizador o cronómetro.
+
+## Demo física sin Internet
+
+El proyecto [foxus_hook_demo](firmware/foxus_hook_demo) conecta Android directamente
+al ESP32 por Wi-Fi local. El botón **THE HOOK!** activa un buzzer y muestra la microacción
+en una TFT redonda GC9A01 de 240×240. No requiere Supabase ni el backend.
+
+Consulta el [cableado, carga con PlatformIO y guion de demostración](docs/demo_hook_local.md).
+Este firmware es independiente del prototipo anterior con LCD 16×2.

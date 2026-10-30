@@ -1,4 +1,5 @@
 from __future__ import annotations
+from app.services.technique_advisor import TechniqueAdvisor
 
 from datetime import UTC, datetime
 import time
@@ -146,6 +147,14 @@ class FoxusOrchestrator:
         learn_step = self._learning_agent.recommend(user_id=user.id, preferences=preferences)
         self._record_trace_step(trace_id=trace_id, user_id=user.id, step=learn_step)
 
+        technique = TechniqueAdvisor(self._db).recommend(
+            user_id=user.id, urgency_phase=ctx_step.output.urgency_phase,
+            time_bucket=ctx_step.output.time_bucket)
+        learn_step.output.recommended_technique = technique.technique
+        learn_step.output.technique_label = technique.label
+        learn_step.output.technique_reason = technique.reason
+        learn_step.output.context_key = technique.context_key
+
         # Step 3: Microtask Agent (Gemma 4)
         micro_step = self._microtask_agent.propose(context=ctx_step.output)
         self._record_trace_step(trace_id=trace_id, user_id=user.id, step=micro_step)
@@ -210,12 +219,15 @@ class FoxusOrchestrator:
             intensity=persisted_intensity,
             channel=hook_step.output.channel,
             status=hook_status,
+            technique=technique.technique,
+            context_key=technique.context_key,
         )
         self._db.add(hook_row)
         self._db.flush()
 
         device_cmd_id: uuid.UUID | None = None
         if policy_decision.allowed:
+            TechniqueAdvisor(self._db).record(user_id=user.id, technique=technique.technique, context_key=technique.context_key, outcome="shown")
             self._learning_agent.record_outcome(
                 user_id=user.id,
                 hook_type=hook_row.hook_type,

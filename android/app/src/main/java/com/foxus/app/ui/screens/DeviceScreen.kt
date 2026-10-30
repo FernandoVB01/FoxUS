@@ -107,6 +107,8 @@ fun DeviceScreen(
             }
         }
 
+        LocalHookDemo()
+
         // Connectivity Mode
         Row(
             modifier = Modifier.fillMaxWidth(),

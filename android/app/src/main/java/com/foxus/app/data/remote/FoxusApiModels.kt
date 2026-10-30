@@ -144,6 +144,7 @@ data class LearningSnapshotDto(
 
 @Serializable
 data class GenerateMissionResponseDto(
+    @SerialName("timer_mode") val timerMode: String = "countdown",
     @SerialName("schema_version") val schemaVersion: Int = 1,
     @SerialName("trace_id") val traceId: String,
     @SerialName("task_id") val taskId: String,

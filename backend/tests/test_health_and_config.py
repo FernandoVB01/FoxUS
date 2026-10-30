@@ -47,3 +47,23 @@ def test_extract_json_and_lcd_formatting() -> None:
     lcd_line = format_lcd_line("¡Diseñar presentación académica!", 16)
     assert len(lcd_line) <= 16
     assert lcd_line.isascii()
+
+
+def test_profile_database_outage_is_not_an_empty_profile(client, auth_headers):
+    from app.core.database import get_db
+    from sqlalchemy.exc import OperationalError
+
+    previous = client.app.dependency_overrides[get_db]
+    def unavailable():
+        raise OperationalError("SELECT 1", {}, Exception("private connection details"))
+        yield  # dependency generator
+
+    client.app.dependency_overrides[get_db] = unavailable
+    try:
+        response = client.get("/api/v1/profile", headers=auth_headers)
+        assert response.status_code == 503
+        assert response.json()["code"] == "database_unavailable"
+        assert "private connection details" not in response.text
+        assert "total_xp" not in response.json()
+    finally:
+        client.app.dependency_overrides[get_db] = previous

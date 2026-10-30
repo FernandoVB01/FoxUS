@@ -149,33 +149,6 @@ fun RewardsScreen(
             }
         }
 
-        // Deterministic Rules Disclosure Card (Section 13)
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(FoxusTokens.SurfaceCard)
-                .border(1.dp, FoxusTokens.BorderSubtle, RoundedCornerShape(16.dp))
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = "Reglas Deterministas del Reward Engine",
-                style = MaterialTheme.typography.titleMedium,
-                color = FoxusTokens.FoxOrange
-            )
-            Text(
-                text = "• +10 XP por inicio válido de sesión · +20 XP por microacción completada (autorreportada) · +10 XP por continuidad voluntaria.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = FoxusTokens.TextSecondary
-            )
-            Text(
-                text = "• Con clave idempotente única en PostgreSQL (nunca duplica XP ante reintentos).",
-                style = MaterialTheme.typography.bodyMedium,
-                color = FoxusTokens.TextSecondary
-            )
-        }
-
         // Achievements
         if (profile.achievements.isNotEmpty()) {
             Column(
@@ -214,44 +187,6 @@ fun RewardsScreen(
             }
         }
 
-        // Learning Agent Adaptive Hook Metrics
-        if (profile.hookStats.isNotEmpty()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(FoxusTokens.SurfaceCard)
-                    .border(1.dp, FoxusTokens.BorderSubtle, RoundedCornerShape(16.dp))
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "Aprendizaje Adaptativo por Hook (Learning Agent)",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = FoxusTokens.FoxGold
-                )
-                profile.hookStats.forEach { stat ->
-                    val label = if (stat.hookType == "fox_bzz") "FOX BZZ (Mosca)" else "FOX Challenge"
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(FoxusTokens.DarkSurface)
-                            .padding(10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(label, color = FoxusTokens.WarmCream, fontWeight = FontWeight.SemiBold)
-                        Text(
-                            text = "Vistos ${stat.shownCount} · Inicios ${stat.startedCount} · Éxitos ${stat.completedCount}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = FoxusTokens.TextSecondary
-                        )
-                    }
-                }
-            }
-        }
-
         // Recent Sessions History
         Column(
             modifier = Modifier
@@ -263,22 +198,22 @@ fun RewardsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Historial Reciente de Sesiones",
+                text = "Tus avances",
                 style = MaterialTheme.typography.titleMedium,
                 color = FoxusTokens.FoxGold
             )
             if (uiState.recentSessions.isEmpty()) {
                 Text(
-                    text = "Aún no hay sesiones registradas. Inicia un reto o FOX BZZ para ver tu historial.",
+                    text = "Tu primer enganche aparecerá aquí.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = FoxusTokens.TextSecondary
                 )
             } else {
                 uiState.recentSessions.take(8).forEach { sess ->
                     val statusLabel = when (sess.status) {
-                        "completed" -> "Completada (${sess.completionSource ?: "autorreportada"})"
+                        "completed" -> "Avance guardado"
                         "started" -> "En progreso"
-                        else -> "Detenida / Pospuesta (${sess.completionSource ?: sess.status})"
+                        else -> "En pausa"
                     }
                     Row(
                         modifier = Modifier
@@ -323,14 +258,14 @@ fun RewardsScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Transacciones de XP (PostgreSQL)",
+                    text = "XP ganados",
                     style = MaterialTheme.typography.titleMedium,
                     color = FoxusTokens.FoxOrange
                 )
                 uiState.rewardTransactions.take(10).forEach { tx ->
                     val reasonLabel = when (tx.rewardType) {
                         "session_start" -> "Inicio válido de microacción"
-                        "microtask_complete" -> "Microacción completada (autorreportada)"
+                        "microtask_complete" -> "Avance guardado"
                         "voluntary_continuity" -> "Continuidad voluntaria extra"
                         else -> tx.rewardType
                     }

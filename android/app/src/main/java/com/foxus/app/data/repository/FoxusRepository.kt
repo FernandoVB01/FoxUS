@@ -43,6 +43,13 @@ class FoxusRepository(
     private val api: FoxusApiService,
     private val dao: FoxusDao
 ) {
+    suspend fun momentMedia(id: String) = runCatching { api.momentMedia(id).use { it.bytes() } }
+    suspend fun momentumProfile() = runCatching { api.getMomentumProfile() }
+    suspend fun continueMomentum(id: String, target: String, minutes: Int, mode: String) = runCatching {
+        api.continueMomentum(id, com.foxus.app.data.remote.ContinueMomentumDto(target, minutes, timerMode = mode))
+    }
+    suspend fun saveMoment(payload: com.foxus.app.data.remote.CreateMomentDto) = runCatching { api.createMoment(payload) }
+
     val cachedTasksFlow: Flow<List<CachedTaskEntity>> = dao.observeTasks()
 
     suspend fun checkBackendHealth(): Result<HealthResponseDto> = runCatching {

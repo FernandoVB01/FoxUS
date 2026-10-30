@@ -10,6 +10,8 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Person
+import com.foxus.app.ui.screens.ProfileScreen
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -51,6 +53,7 @@ object FoxusRoutes {
     const val TASKS = "tasks"
     const val CHALLENGE = "challenge"
     const val FOX_BZZ = "fox_bzz"
+    const val PROFILE = "profile"
     const val REWARDS = "rewards"
     const val DEVICE = "device"
     const val AGENT_DEBUG = "agent_debug"
@@ -67,7 +70,7 @@ private val bottomItems = listOf(
     BottomNavItem(FoxusRoutes.HOME, "Inicio", Icons.Filled.Home),
     BottomNavItem(FoxusRoutes.TASKS, "Tareas", Icons.Filled.CheckCircle),
     BottomNavItem(FoxusRoutes.CHALLENGE, "Reto", Icons.Filled.Bolt),
-    BottomNavItem(FoxusRoutes.REWARDS, "Logros", Icons.Filled.EmojiEvents),
+    BottomNavItem(FoxusRoutes.PROFILE, "Perfil", Icons.Filled.Person),
     BottomNavItem(FoxusRoutes.DEVICE, "FoxusWatch", Icons.Filled.Watch)
 )
 
@@ -217,7 +220,7 @@ fun FoxusNavHost(
                         }
                         navController.navigate(dest)
                     },
-                    onGoToRewards = { navController.navigate(FoxusRoutes.REWARDS) },
+                    onGoToRewards = { navController.navigate(FoxusRoutes.PROFILE) },
                     onGoToTraces = { navController.navigate(FoxusRoutes.AGENT_DEBUG) },
                     onGoToSettings = { navController.navigate(FoxusRoutes.SETTINGS) },
                     onTriggerImmersiveNow = { viewModel.triggerImmersiveInterruptNow() },
@@ -256,6 +259,7 @@ fun FoxusNavHost(
             composable(FoxusRoutes.CHALLENGE) {
                 ChallengeScreen(
                     uiState = uiState,
+                    onOpenProfile = { navController.navigate(FoxusRoutes.PROFILE) },
                     onStartTimer = { viewModel.startChallengeTimer() },
                     onBulletCheckedCheer = { checkedCount, totalCount ->
                         viewModel.onBulletStepChecked(checkedCount, totalCount)
@@ -315,6 +319,15 @@ fun FoxusNavHost(
                     onPickTaskFirst = { navController.navigate(FoxusRoutes.TASKS) },
                     onOpenTraces = { navController.navigate(FoxusRoutes.AGENT_DEBUG) }
                 )
+            }
+            composable(FoxusRoutes.PROFILE) {
+                ProfileScreen(uiState, { viewModel.refreshMomentum() },
+                    { id, target, minutes, mode -> viewModel.continueMomentum(id, target, minutes, mode) {
+                        navController.navigate(FoxusRoutes.CHALLENGE) { launchSingleTop = true }
+                    } },
+                    { session, kind, caption, image, mime, media, units, unit -> viewModel.saveMoment(session, kind, caption, image, mime, media, units, unit) },
+                    { id, ready -> viewModel.openMomentMedia(id, ready) },
+                    { navController.navigate(FoxusRoutes.REWARDS) })
             }
             composable(FoxusRoutes.REWARDS) {
                 RewardsScreen(

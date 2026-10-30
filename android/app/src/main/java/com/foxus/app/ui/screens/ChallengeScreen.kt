@@ -101,6 +101,7 @@ fun ChallengeScreen(
     onCompleteChallengeWithoutEvidence: (voluntaryContinuity: Boolean) -> Unit,
     onPostpone: () -> Unit,
     onOpenTraces: () -> Unit,
+    onOpenProfile: () -> Unit,
     onPickTaskFirst: () -> Unit
 ) {
     val mission = uiState.activeMission
@@ -259,7 +260,12 @@ fun ChallengeScreen(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 FoxMascot(state = mascotState, size = 108.dp)
                 Text(
-                    text = formatCountdownClock(uiState.remainingTimerSeconds),
+                    text = if (mission.timerMode == "stopwatch") "Cronómetro · máx. ${uiState.totalTimerSeconds / 60} min" else "Tiempo restante",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = FoxusTokens.WarmCream
+                )
+                Text(
+                    text = formatCountdownClock(if (mission.timerMode == "stopwatch") uiState.elapsedSessionSeconds else uiState.remainingTimerSeconds),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.ExtraBold,
                     color = FoxusTokens.WarmCream
@@ -420,7 +426,7 @@ fun ChallengeScreen(
                             )
                         ) {
                             Text(
-                                text = "SILBATAZO INICIAL (+10 XP)",
+                                text = "EMPEZAR",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.ExtraBold
                             )
@@ -449,7 +455,7 @@ fun ChallengeScreen(
                             )
                         ) {
                             Text(
-                                text = "🏁 TERMINAR Y VERIFICAR CON IA (+35 XP)",
+                                text = "MOSTRAR MI AVANCE",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.ExtraBold
                             )
@@ -476,12 +482,12 @@ fun ChallengeScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Text(
-                                text = "ÁRBITRO IA · DEMUESTRA TU AVANCE",
+                                text = "TU AVANCE",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = FoxusTokens.FoxGold
                             )
                             Text(
-                                text = "Sube una foto de lo que avanzaste o cuéntalo con tu voz. Google Gemma 4 analizará tu evidencia y te dará +15 XP extra.",
+                                text = "Una foto o tu voz. Tú eliges.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = FoxusTokens.WarmCream,
                                 textAlign = TextAlign.Center
@@ -510,7 +516,7 @@ fun ChallengeScreen(
                                         strokeWidth = 3.dp
                                     )
                                     Text(
-                                        text = "El Árbitro IA (Gemma 4) está revisando tu evidencia...",
+                                        text = "Revisando tu avance…",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = FoxusTokens.FoxGold
                                     )
@@ -598,7 +604,7 @@ fun ChallengeScreen(
                                     onClick = { onCompleteChallengeWithoutEvidence(false) }
                                 ) {
                                     Text(
-                                        text = "Finalizar sin evidencia (+20 XP base)",
+                                        text = "Guardar sin evidencia",
                                         color = FoxusTokens.TextSecondary
                                     )
                                 }
@@ -664,13 +670,13 @@ fun ChallengeScreen(
 
                             Spacer(modifier = Modifier.height(4.dp))
                             Button(
-                                onClick = onPickTaskFirst,
+                                onClick = onOpenProfile,
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = FoxusTokens.FoxOrange,
                                     contentColor = FoxusTokens.DarkSurface
                                 )
                             ) {
-                                Text("IR A OTRA TAREA", fontWeight = FontWeight.Bold)
+                                Text("SEGUIR MI ENGANCHE", fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -681,7 +687,7 @@ fun ChallengeScreen(
         // Collapsible Reasoning & Multi-Agent Trace
         TextButton(onClick = { showTechDetails = !showTechDetails }) {
             Text(
-                text = if (showTechDetails) "Ocultar detalles de IA" else "Más info y arquitectura IA",
+                text = if (showTechDetails) "Ocultar detalles de IA" else "Ver detalles",
                 color = FoxusTokens.SlateBlue
             )
             Icon(

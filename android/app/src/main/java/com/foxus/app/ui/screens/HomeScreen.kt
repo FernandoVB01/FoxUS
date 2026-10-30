@@ -185,7 +185,7 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "⚠️ Tu token temporal de Google venció (1h). Toca aquí para renovarlo y traer tus tareas nuevas.",
+                    text = "Reconecta Google para actualizar tus tareas.",
                     style = MaterialTheme.typography.bodySmall,
                     color = FoxusTokens.WarningAmber,
                     fontWeight = FontWeight.SemiBold,
@@ -317,7 +317,7 @@ fun HomeScreen(
                     ) {
                         Icon(Icons.Filled.Bolt, contentDescription = null)
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Reto 3 min", fontWeight = FontWeight.ExtraBold)
+                        Text("Engancharme", fontWeight = FontWeight.ExtraBold)
                     }
 
                     OutlinedButton(
@@ -349,7 +349,7 @@ fun HomeScreen(
                         contentColor = FoxusTokens.DarkSurface
                     )
                 ) {
-                    Text("+ NUEVA TAREA O GOOGLE TASKS", fontWeight = FontWeight.Bold)
+                    Text("AÑADIR ACTIVIDAD", fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -404,7 +404,7 @@ fun HomeScreen(
                         )
                     }
                     TextButton(onClick = onGoToTraces) {
-                        Text("Abrir trazabilidad de agentes Gemma 4 ➔", color = FoxusTokens.FoxOrange)
+                        Text("Ver diagnóstico", color = FoxusTokens.FoxOrange)
                     }
                 }
             }
@@ -434,7 +434,7 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Alertas Emergentes y Minijuegos",
+                        text = "Mis enganches",
                         style = MaterialTheme.typography.titleSmall,
                         color = FoxusTokens.WarmCream,
                         fontWeight = FontWeight.SemiBold
@@ -520,7 +520,7 @@ fun HomeScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Superponer sobre otras apps (Opcional)",
+                                text = "Mostrar sobre otras apps",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = FoxusTokens.WarmCream
                             )

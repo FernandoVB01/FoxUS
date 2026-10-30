@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.api.v1 import (
     agents,
+    profile,
     demo,
     devices,
     integrations,
@@ -24,3 +25,5 @@ api_v1_router.include_router(preferences.router)
 api_v1_router.include_router(devices.router)
 api_v1_router.include_router(integrations.router)
 api_v1_router.include_router(demo.router)
+
+api_v1_router.include_router(profile.router)

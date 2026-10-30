@@ -48,6 +48,9 @@ data class FoxusUiState(
     val aiModeLabel: String = "Conectando...",
     val tasks: List<CachedTaskEntity> = emptyList(),
     val googleStatus: GoogleStatusResponseDto = GoogleStatusResponseDto(),
+    val momentumProfile: com.foxus.app.data.remote.MomentumProfileDto? = null,
+    val momentumError: String? = null,
+    val isMomentumLoading: Boolean = false,
     val rewardProfile: RewardProfileDto = RewardProfileDto(),
     val rewardTransactions: List<RewardTransactionDto> = emptyList(),
     val recentSessions: List<SessionDto> = emptyList(),
@@ -326,7 +329,72 @@ class FoxusMainViewModel(
         }
     }
 
+    fun refreshMomentum() {
+        if (_uiState.value.isMomentumLoading) return
+        _uiState.update { it.copy(isMomentumLoading = true, momentumError = null) }
+        viewModelScope.launch {
+            repository.momentumProfile().onSuccess { profile ->
+                _uiState.update { it.copy(momentumProfile = profile, momentumError = null, isMomentumLoading = false) }
+            }.onFailure { error ->
+                val message = when ((error as? retrofit2.HttpException)?.code()) {
+                    401, 403 -> "Revisa el token de acceso en Ajustes."
+                    503 -> "La base de datos no está disponible. Reintenta en unos momentos."
+                    else -> "No hay conexión con tu perfil. Comprueba el servidor y reintenta."
+                }
+                _uiState.update { it.copy(momentumError = message, isMomentumLoading = false) }
+            }
+        }
+    }
+
+    fun continueMomentum(chainId: String, target: String, minutes: Int, mode: String, onReady: () -> Unit) {
+        if (_uiState.value.isActionBusy) return
+        if (_uiState.value.challengePhase == ChallengePhase.RUNNING) {
+            _uiState.update { it.copy(statusBanner = "Termina o pausa tu enganche actual primero.") }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isActionBusy = true) }
+            repository.continueMomentum(chainId, target, minutes, mode).onSuccess { mission ->
+                timerJob?.cancel()
+                val seconds = mission.microtask.estimatedSeconds
+                _uiState.update { it.copy(activeMission = mission, activeSessionId = null,
+                    challengePhase = ChallengePhase.IDLE_READY, totalTimerSeconds = seconds,
+                    remainingTimerSeconds = seconds, elapsedSessionSeconds = 0,
+                    latestRefereeVerdict = null, lastEarnedXp = 0, isActionBusy = false,
+                    coachLiveMessage = mission.hook.message) }
+                onReady()
+            }.onFailure { error ->
+                val detail = (error as? retrofit2.HttpException)?.response()?.errorBody()?.string()
+                    ?.let { runCatching { org.json.JSONObject(it).optString("detail") }.getOrNull() }
+                _uiState.update { it.copy(isActionBusy = false, statusBanner = detail ?: "No se pudo preparar el enganche.") }
+            }
+        }
+    }
+
+    fun openMomentMedia(id: String, ready: (ByteArray) -> Unit) {
+        viewModelScope.launch {
+            repository.momentMedia(id).onSuccess(ready).onFailure {
+                _uiState.update { it.copy(statusBanner = "No se pudo descargar el archivo.") }
+            }
+        }
+    }
+
+    fun saveMoment(sessionId: String, kind: String, caption: String, image: String?, mime: String?, media: String?, units: Int?, unit: String) {
+        if (_uiState.value.isActionBusy) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isActionBusy = true) }
+            repository.saveMoment(com.foxus.app.data.remote.CreateMomentDto(sessionId, kind, caption, units, unit, image, mime, media))
+                .onSuccess {
+                    refreshMomentum()
+                    refreshRewardsAndHistory()
+                    _uiState.update { it.copy(statusBanner = "Momento guardado en tu perfil") }
+                }.onFailure { _uiState.update { it.copy(statusBanner = "No se pudo guardar. Revisa la conexión y reintenta.") } }
+            _uiState.update { it.copy(isActionBusy = false) }
+        }
+    }
+
     fun refreshRewardsAndHistory() {
+        refreshMomentum()
         viewModelScope.launch {
             repository.fetchRewardProfile().onSuccess { profile ->
                 _uiState.update { it.copy(rewardProfile = profile) }
@@ -586,6 +654,9 @@ class FoxusMainViewModel(
                         audioController.playEffect(FoxSoundEffect.LEVEL_UP)
                     }
                     refreshRewardsAndHistory()
+                }.onFailure {
+                    _uiState.update { it.copy(isActionBusy = false, statusBanner = "No se pudo iniciar. Reintenta cuando tengas conexión.") }
+                    return@launch
                 }
             }
 
@@ -618,6 +689,8 @@ class FoxusMainViewModel(
     private fun launchCountdownLoop() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
+            val clockStart = android.os.SystemClock.elapsedRealtime()
+            val initialElapsed = _uiState.value.elapsedSessionSeconds
             while (_uiState.value.challengePhase == ChallengePhase.RUNNING &&
                 _uiState.value.remainingTimerSeconds > 0
             ) {
@@ -625,19 +698,19 @@ class FoxusMainViewModel(
                 val curr = _uiState.value
                 if (curr.challengePhase != ChallengePhase.RUNNING) break
 
-                val nextRemaining = (curr.remainingTimerSeconds - 1).coerceAtLeast(0)
-                val nextElapsed = curr.elapsedSessionSeconds + 1
+                val nextElapsed = (initialElapsed + (android.os.SystemClock.elapsedRealtime() - clockStart) / 1000).toInt().coerceAtMost(curr.totalTimerSeconds)
+                val nextRemaining = (curr.totalTimerSeconds - nextElapsed).coerceAtLeast(0)
                 val halfway = curr.totalTimerSeconds / 2
                 val mission = curr.activeMission
 
                 var updatedCoachMsg = curr.coachLiveMessage
-                if (halfway >= 30 && nextElapsed == halfway) {
+                if (mission?.timerMode != "stopwatch" && halfway >= 30 && nextElapsed == halfway) {
                     val midLine = mission?.hook?.coachVoiceLines?.getOrNull(1)
                         ?: "¡Mitad del tiempo! Mantén el ritmo, vas excelente."
                     updatedCoachMsg = midLine
                     audioController.playEffect(FoxSoundEffect.CROWD_CHEER)
                     audioController.speakCoachLine(midLine)
-                } else if (nextRemaining == 30 && curr.totalTimerSeconds > 45) {
+                } else if (mission?.timerMode != "stopwatch" && nextRemaining == 30 && curr.totalTimerSeconds > 45) {
                     val finalSprintLine = mission?.hook?.coachVoiceLines?.getOrNull(2)
                         ?: "¡Últimos 30 segundos! Cierra este paso y prepárate para mostrar tu avance."
                     updatedCoachMsg = finalSprintLine
@@ -779,34 +852,11 @@ class FoxusMainViewModel(
                 }
             }
 
-            // Offline fallback if session wasn't synced remotely
-            val fallbackVerdict = RefereeVerdictDto(
-                verified = true,
-                evidenceType = evidenceType,
-                confidenceScore = 80,
-                refereeSpeech = "¡Silbatazo final! Excelente evidencia de arranque, rompiste la procrastinación.",
-                detectedProgress = if (evidenceType == "voice") {
-                    voiceTranscript?.take(120) ?: "Reporte de voz completado."
-                } else {
-                    "Captura visual registrada."
-                },
-                nextTip = "Descansa o aprovecha la racha con 3 minutos más.",
-                generationSource = "deterministic_fallback",
-                modelName = "local_referee"
-            )
-            audioController.playEffect(FoxSoundEffect.MISSION_COMPLETE)
-            audioController.speakCoachLine(fallbackVerdict.refereeSpeech)
             _uiState.update {
-                it.copy(
-                    isVerifyingEvidence = false,
-                    isActionBusy = false,
-                    challengePhase = ChallengePhase.COMPLETED_VICTORY,
-                    latestRefereeVerdict = fallbackVerdict,
-                    coachLiveMessage = fallbackVerdict.refereeSpeech,
-                    lastEarnedXp = it.lastEarnedXp + 35,
-                    lcdLine1 = "DONE! +35 XP",
-                    lcdLine2 = "Good start!"
-                )
+                it.copy(isVerifyingEvidence = false, isActionBusy = false,
+                    latestRefereeVerdict = null,
+                    statusBanner = if (sessId == null) "Este reto es local: no se ha guardado en tu perfil." else
+                        "No se pudo guardar la evidencia. Puedes reintentar.")
             }
         }
     }
@@ -819,6 +869,10 @@ class FoxusMainViewModel(
         audioController.stopSpeech()
         audioController.setFocusSessionMusicActive(false)
         val sessId = state.activeSessionId
+        if (sessId == null) {
+            _uiState.update { it.copy(statusBanner = "Este reto es local: no se ha guardado en tu perfil.") }
+            return
+        }
         val prevLevel = state.rewardProfile.level
 
         viewModelScope.launch {
@@ -834,6 +888,9 @@ class FoxusMainViewModel(
                     earned = res.rewardsGranted.sumOf { it.xpAwarded }
                     newLevel = res.currentLevel
                     refreshRewardsAndHistory()
+                }.onFailure {
+                    _uiState.update { it.copy(isActionBusy = false, statusBanner = "Tu avance no se guardó. Reintenta cuando tengas conexión.") }
+                    return@launch
                 }
             }
             if (newLevel > prevLevel) {

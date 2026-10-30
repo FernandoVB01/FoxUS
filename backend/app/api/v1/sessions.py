@@ -192,6 +192,17 @@ def verify_session_evidence(
             session_id=session_id,
             microtask_id=sess.microtask_id,
         )
+        if not bonus_grant.already_granted:
+            from app.models.entities import Hook, ChainLink
+            from app.services.technique_advisor import TechniqueAdvisor
+            hook = db.get(Hook, sess.hook_id) if sess.hook_id else None
+            if hook:
+                TechniqueAdvisor(db).record(user_id=user.id, technique=hook.technique,
+                                             context_key=hook.context_key, outcome="verified")
+            link = db.scalar(select(ChainLink).where(ChainLink.session_id == session_id))
+            if link:
+                link.verified = True
+                link.evidence_type = payload.evidence_type
         bonus_xp = bonus_grant.xp_awarded
         session_res.rewards_granted.append(bonus_grant)
         total_xp = reward_engine.get_user_total_xp(db, user.id)
