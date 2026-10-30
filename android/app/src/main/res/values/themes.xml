@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Foxus" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/dark_surface</item>
+        <item name="android:navigationBarColor">@color/dark_surface</item>
+    </style>
+
+    <style name="Theme.Foxus.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/deep_navy</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/avd_fox_splash</item>
+        <item name="windowSplashScreenAnimationDuration">680</item>
+        <item name="postSplashScreenTheme">@style/Theme.Foxus</item>
+    </style>
+</resources>

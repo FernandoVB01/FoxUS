@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="512" height="512">
+  <rect width="108" height="108" rx="24" fill="#093B4A"/>
+  <!-- Outer & inner angular ears -->
+  <polygon points="25,18 28,44 38,33" fill="#DA5B14"/>
+  <polygon points="25,18 44,32 38,33" fill="#E96D1B"/>
+  <polygon points="83,18 70,33 80,44" fill="#DA5B14"/>
+  <polygon points="83,18 70,33 64,32" fill="#E96D1B"/>
+  <!-- Upper orange cheeks -->
+  <polygon points="28,44 44,32 50,63 22,57" fill="#F58220"/>
+  <polygon points="80,44 86,57 58,63 64,32" fill="#F58220"/>
+  <!-- Forehead & nose bridge -->
+  <polygon points="44,32 64,32 58,52 57.5,74 50.5,74 50,52" fill="#F8B62D"/>
+  <!-- Jaw shadow -->
+  <polygon points="30,68 49,85 59,85 78,68 70,78 58,88 50,88 38,78" fill="#B38B59"/>
+  <!-- Warm cream muzzle -->
+  <polygon points="22,57 50,63 50.5,74 54,81 57.5,74 58,63 86,57 77,69 59,84 49,84 31,69" fill="#F5EBD7"/>
+  <!-- Focused eyes & nose -->
+  <polygon points="36,50 47,55 45.5,59.5 37.5,57.5" fill="#1B2830"/>
+  <polygon points="72,50 70.5,57.5 62.5,59.5 61,55" fill="#1B2830"/>
+  <polygon points="49.5,74 58.5,74 54,80.5" fill="#1B2830"/>
+</svg>

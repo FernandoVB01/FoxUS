@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FOXUS Official Geometric Fox Adaptive Icon Foreground (Text-free extraction).
+  Strictly respects Android's 66dp central safe zone inside the 108x108 viewport.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Left & Right Outer Burnt-Orange Ear Facets -->
+    <path
+        android:fillColor="#DA5B14"
+        android:pathData="M29,24 L31,45 L39,36 Z" />
+    <path
+        android:fillColor="#DA5B14"
+        android:pathData="M79,24 L69,36 L77,45 Z" />
+
+    <!-- Left & Right Inner-Orange Ear Facets -->
+    <path
+        android:fillColor="#E96D1B"
+        android:pathData="M29,24 L45,35 L39,36 Z" />
+    <path
+        android:fillColor="#E96D1B"
+        android:pathData="M79,24 L69,36 L63,35 Z" />
+
+    <!-- Left & Right Upper Cheek Facets (Fox Orange) -->
+    <path
+        android:fillColor="#F58220"
+        android:pathData="M31,45 L45,35 L50,62 L26,57 Z" />
+    <path
+        android:fillColor="#F58220"
+        android:pathData="M77,45 L82,57 L58,62 L63,35 Z" />
+
+    <!-- Central Forehead Crown & Nose Bridge (Fox Gold) -->
+    <path
+        android:fillColor="#F8B62D"
+        android:pathData="M45,35 L63,35 L58,52 L57,72 L51,72 L50,52 Z" />
+
+    <!-- Warm Tan Jaw Underside Shadow -->
+    <path
+        android:fillColor="#B38B59"
+        android:pathData="M33,66 L50,82 L58,82 L75,66 L69,75 L58,84 L50,84 L39,75 Z" />
+
+    <!-- Warm Cream Lower Cheeks & Muzzle -->
+    <path
+        android:fillColor="#F5EBD7"
+        android:pathData="M26,57 L50,62 L51,72 L54,79 L57,72 L58,62 L82,57 L74,67 L58,81 L50,81 L34,67 Z" />
+
+    <!-- Focused Angular Charcoal Eyes -->
+    <path
+        android:fillColor="#1B2830"
+        android:pathData="M38,50 L47,55 L46,59 L39,57 Z" />
+    <path
+        android:fillColor="#1B2830"
+        android:pathData="M70,50 L69,57 L62,59 L61,55 Z" />
+
+    <!-- Charcoal Nose Tip -->
+    <path
+        android:fillColor="#1B2830"
+        android:pathData="M50,72 L58,72 L54,78 Z" />
+
+</vector>

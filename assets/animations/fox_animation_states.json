@@ -1,0 +1,43 @@
+{
+  "schema": "foxus_mascot_animation_spec_v1",
+  "license": "Apache-2.0",
+  "derived_from": "assets/brand/foxus_logo.png",
+  "states": {
+    "IDLE": {
+      "breath_period_ms": 2200,
+      "blink_period_ms": 3600,
+      "head_tilt_deg": 0.0,
+      "visual_cue": "Soft navy aura, natural blinking, subtle ear breathing"
+    },
+    "CURIOUS": {
+      "breath_period_ms": 1900,
+      "head_tilt_deg": 9.0,
+      "visual_cue": "Asymmetric ear perk and floating golden geometric diamond"
+    },
+    "CHALLENGE": {
+      "breath_period_ms": 1050,
+      "head_tilt_deg": 0.0,
+      "visual_cue": "Expanding angular diamond shockwave rings and energetic FoxOrange aura"
+    },
+    "FOCUS": {
+      "breath_period_ms": 3200,
+      "orbit_period_ms": 4000,
+      "visual_cue": "Calm 60 BPM cadence ring with orbiting focus satellite"
+    },
+    "VICTORY": {
+      "breath_period_ms": 950,
+      "particle_period_ms": 1650,
+      "visual_cue": "Happy chevron eyes (^ ^) and bursting low-poly diamond/triangle confetti"
+    },
+    "SLEEP": {
+      "breath_period_ms": 3600,
+      "head_tilt_deg": -5.0,
+      "visual_cue": "Closed eyes and rising geometric Z glyphs"
+    },
+    "PLAYFUL": {
+      "swing_period_ms": 820,
+      "wink_period_ms": 2400,
+      "visual_cue": "Alternating ear wiggle, rhythmic head swing, and mischievous right-eye wink"
+    }
+  }
+}
