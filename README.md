@@ -1,4 +1,4 @@
-# FOXUS 🦊 — AI-Powered Anti-Procrastination Companion
+# FOXUS 🦊 — AI-Powered Anti-Procrastination Companion.
 
 > **Hacktoberfest ESPOL: Clubs Royale** · Open Source (`Apache-2.0`) · Impulsado por **Google Gemma 4** (`gemma-4-26b-a4b-it`)
 
